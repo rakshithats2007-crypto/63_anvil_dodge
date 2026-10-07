@@ -1,4 +1,6 @@
 import pygame
+import random
+
 from game.player import Player
 from game.anvil import Anvil
 
@@ -9,6 +11,10 @@ class GameEngine:
         self.height = height
         self.player = Player(width, height)
         self.anvils = []
+
+        # Task 4: impact effects
+        self.particles = []
+        self.screen_shake = 0
 
         self.spawn_delay = 700
         self.last_spawn_time = pygame.time.get_ticks()
@@ -45,9 +51,9 @@ class GameEngine:
             pygame.time.get_ticks() - self.start_ticks
         ) // 1000
 
-        # -----------------------------
-        # Task 2: Dynamic Difficulty
-        # -----------------------------
+        # ---------------------------------
+        # Task 2: Dynamic Difficulty Scaling
+        # ---------------------------------
 
         now = pygame.time.get_ticks()
 
@@ -69,21 +75,71 @@ class GameEngine:
             )
             self.last_spawn_time = now
 
+        # ---------------------------------
         # Update anvils
+        # ---------------------------------
+
         player_rect = self.player.rect
 
         for anvil in self.anvils[:]:
             anvil.update()
 
+            # Collision remains unchanged
             if player_rect.colliderect(anvil.rect):
                 self.game_state = "GAME_OVER"
 
+            # Anvil reaches the ground
             if anvil.is_off_screen(self.height):
+                self.create_impact_effect(
+                    anvil.x + anvil.width // 2,
+                    self.height - 20
+                )
+
                 self.anvils.remove(anvil)
+
+        # ---------------------------------
+        # Task 4: Update impact particles
+        # ---------------------------------
+
+        for particle in self.particles[:]:
+            particle["x"] += particle["vx"]
+            particle["y"] += particle["vy"]
+
+            # Gravity
+            particle["vy"] += 0.2
+
+            particle["life"] -= 1
+
+            if particle["life"] <= 0:
+                self.particles.remove(particle)
+
+        # Gradually stop screen shake
+        if self.screen_shake > 0:
+            self.screen_shake -= 1
+
+    def create_impact_effect(self, x, y):
+        # Create small particles
+        for _ in range(12):
+            particle = {
+                "x": x,
+                "y": y,
+                "vx": random.uniform(-3, 3),
+                "vy": random.uniform(-4, -1),
+                "life": 20
+            }
+
+            self.particles.append(particle)
+
+        # Start screen shake
+        self.screen_shake = 6
 
     def reset(self):
         self.player = Player(self.width, self.height)
         self.anvils.clear()
+
+        # Clear Task 4 effects
+        self.particles.clear()
+        self.screen_shake = 0
 
         self.start_ticks = pygame.time.get_ticks()
         self.last_spawn_time = pygame.time.get_ticks()
@@ -92,47 +148,81 @@ class GameEngine:
         self.game_state = "PLAYING"
 
     def render(self, screen):
-        screen.fill((35, 38, 45))
+        # Create temporary surface for the game
+        game_surface = pygame.Surface(
+            (self.width, self.height)
+        )
+
+        game_surface.fill((35, 38, 45))
 
         ground_y = self.height - 20
 
         pygame.draw.rect(
-            screen,
+            game_surface,
             (70, 75, 85),
             (0, ground_y, self.width, 20)
         )
 
         pygame.draw.line(
-            screen,
+            game_surface,
             (160, 90, 40),
             (0, ground_y),
             (self.width, ground_y),
             3
         )
 
-        self.player.render(screen)
+        # Draw player
+        self.player.render(game_surface)
 
+        # Draw anvils
         for anvil in self.anvils:
-            anvil.render(screen)
+            anvil.render(game_surface)
 
+        # ---------------------------------
+        # Task 4: Draw impact particles
+        # ---------------------------------
+
+        for particle in self.particles:
+            pygame.draw.circle(
+                game_surface,
+                (230, 180, 80),
+                (
+                    int(particle["x"]),
+                    int(particle["y"])
+                ),
+                3
+            )
+
+        # Survival time
         time_surf = self.font_medium.render(
             f"Survival Time: {self.survival_time}s",
             True,
             (240, 240, 240)
         )
 
-        screen.blit(time_surf, (20, 20))
+        game_surface.blit(
+            time_surf,
+            (20, 20)
+        )
 
+        # Instructions
         inst_surf = self.font_small.render(
             "Use [A/D] or [Arrow Keys] to Dodge",
             True,
             (170, 175, 185)
         )
 
-        screen.blit(
+        game_surface.blit(
             inst_surf,
-            (self.width - inst_surf.get_width() - 20, 25)
+            (
+                self.width - inst_surf.get_width() - 20,
+                25
+            )
         )
+
+        # ---------------------------------
+        # Game Over screen
+        # ---------------------------------
 
         if self.game_state == "GAME_OVER":
             overlay = pygame.Surface(
@@ -141,7 +231,11 @@ class GameEngine:
             )
 
             overlay.fill((0, 0, 0, 190))
-            screen.blit(overlay, (0, 0))
+
+            game_surface.blit(
+                overlay,
+                (0, 0)
+            )
 
             over_surf = self.font_big.render(
                 "CRUSHED! GAME OVER",
@@ -149,10 +243,11 @@ class GameEngine:
                 (235, 65, 65)
             )
 
-            screen.blit(
+            game_surface.blit(
                 over_surf,
                 (
-                    self.width // 2 - over_surf.get_width() // 2,
+                    self.width // 2
+                    - over_surf.get_width() // 2,
                     self.height // 2 - 60
                 )
             )
@@ -163,10 +258,11 @@ class GameEngine:
                 (255, 255, 255)
             )
 
-            screen.blit(
+            game_surface.blit(
                 score_surf,
                 (
-                    self.width // 2 - score_surf.get_width() // 2,
+                    self.width // 2
+                    - score_surf.get_width() // 2,
                     self.height // 2
                 )
             )
@@ -177,10 +273,37 @@ class GameEngine:
                 (200, 200, 200)
             )
 
-            screen.blit(
+            game_surface.blit(
                 restart_surf,
                 (
-                    self.width // 2 - restart_surf.get_width() // 2,
+                    self.width // 2
+                    - restart_surf.get_width() // 2,
                     self.height // 2 + 50
                 )
             )
+
+        # ---------------------------------
+        # Task 4: Screen shake
+        # ---------------------------------
+
+        offset_x = 0
+        offset_y = 0
+
+        if self.screen_shake > 0:
+            offset_x = random.randint(
+                -self.screen_shake,
+                self.screen_shake
+            )
+
+            offset_y = random.randint(
+                -self.screen_shake,
+                self.screen_shake
+            )
+
+        # Draw final game surface
+        screen.fill((35, 38, 45))
+
+        screen.blit(
+            game_surface,
+            (offset_x, offset_y)
+        )
