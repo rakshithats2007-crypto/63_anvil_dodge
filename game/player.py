@@ -19,7 +19,7 @@ class Player:
         self.x += self.speed
 
     def update(self):
-        pass
+        self.x = max(0, min(self.x, self.screen_width - self.width))
 
     @property
     def rect(self):
@@ -29,6 +29,17 @@ class Player:
         torso_rect = pygame.Rect(int(self.x) + 6, int(self.y) + 18, 32, 36)
         pygame.draw.rect(surface, (50, 130, 220), torso_rect, border_radius=4)
 
-        pygame.draw.circle(surface, (230, 200, 160), (int(self.x) + 22, int(self.y) + 12), 12)
-        helmet_rect = pygame.Rect(int(self.x) + 8, int(self.y) - 2, 28, 12)
+        pygame.draw.circle(
+            surface,
+            (230, 200, 160),
+            (int(self.x) + 22, int(self.y) + 12),
+            12
+        )
+
+        helmet_rect = pygame.Rect(
+            int(self.x) + 8,
+            int(self.y) - 2,
+            28,
+            12
+        )
         pygame.draw.rect(surface, (180, 180, 190), helmet_rect, border_radius=4)
