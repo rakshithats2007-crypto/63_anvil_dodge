@@ -3,13 +3,13 @@ import pygame
 
 
 class Anvil:
-    def __init__(self, screen_width):
+    def __init__(self, screen_width, speed_multiplier=1.0):
         self.screen_width = screen_width
         self.width = 40
         self.height = 32
         self.x = random.randint(20, screen_width - self.width - 20)
         self.y = -self.height
-        self.speed = random.uniform(4.5, 7.0)
+        self.speed = random.uniform(4.5, 7.0) * speed_multiplier
 
     def update(self):
         self.y += self.speed
